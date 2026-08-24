@@ -4,7 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Heart, LockKeyhole, Volume2, VolumeX, Sparkles, ArrowDown, ArrowUpRight, Bike, CalendarDays, Camera, Check, ChevronRight, Gift, HandHeart, Mail, Star, X } from 'lucide-react';
+import { Heart, LockKeyhole, Volume2, VolumeX, Sparkles, ArrowDown, ArrowUpRight, Bike, CalendarDays, Camera, Check, ChevronRight, Gift, HandHeart, Mail, MessageCircle, RotateCcw, Shield, Shuffle, Star, X, Zap } from 'lucide-react';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import roadKiss from '@assets/WhatsApp_Image_2026-08-24_at_00.07.17_1787591436322.jpeg';
 import herBlack from '@assets/WhatsApp_Image_2026-08-24_at_21.02.17_1787591436319.jpeg';
@@ -36,6 +36,16 @@ const photos = [
   { title: 'The promise', caption: 'The promise of never letting go', image: roadKiss, note: 'Some promises do not need witnesses. They just need two people who keep choosing each other.' , locked: true },
   { title: 'From Hii to Forever', caption: 'A little archive of us', image: coupleRoad, note: 'Every road, every late night, every “sorry” — I would choose it all again.' },
 ];
+
+type MatchCard = { id: number; pair: number; image: string; flipped: boolean; matched: boolean };
+const matchImages = [firstFrame, herHearts, coupleRoadTwo, waterfall];
+const makeMatchDeck = (): MatchCard[] => {
+  const cards = matchImages.flatMap((image, pair) => [
+    { id: pair * 2, pair, image, flipped: false, matched: false },
+    { id: pair * 2 + 1, pair, image, flipped: false, matched: false },
+  ]);
+  return cards.sort(() => Math.random() - 0.5);
+};
 
 const monthNotes: Record<string, string> = {
   January: 'Everyone warned me not to love you. I fell harder.',
@@ -78,7 +88,12 @@ function Home() {
   const [musicOn, setMusicOn] = useState(false);
   const [yesCaught, setYesCaught] = useState(false);
   const [yesPos, setYesPos] = useState({ x: 50, y: 55 });
+  const [noPos, setNoPos] = useState({ x: 72, y: 50 });
+  const [yesAttempts, setYesAttempts] = useState(0);
   const [noHover, setNoHover] = useState(false);
+  const [loveReason, setLoveReason] = useState('');
+  const [loveNoteSaved, setLoveNoteSaved] = useState(false);
+  const [loveReasonError, setLoveReasonError] = useState('');
   const [heartCount, setHeartCount] = useState(0);
   const [month, setMonth] = useState('');
   const [photoOpen, setPhotoOpen] = useState<number | null>(null);
@@ -87,11 +102,61 @@ function Home() {
   const [finalReveal, setFinalReveal] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const [notesCaught, setNotesCaught] = useState<string[]>([]);
+  const [matchDeck, setMatchDeck] = useState<MatchCard[]>(makeMatchDeck);
+  const [matchFlipped, setMatchFlipped] = useState<number[]>([]);
+  const [matchMoves, setMatchMoves] = useState(0);
+  const [matchLocked, setMatchLocked] = useState(false);
 
   const celebrationBits = useMemo(() => Array.from({ length: 46 }, (_, index) => ({ index, left: `${(index * 37) % 100}%`, color: ['#df7380', '#e3aa61', '#f4dfb7', '#77609b'][index % 4], delay: `${(index % 10) * .12}s`, fall: `${2.8 + (index % 5) * .35}s` })), []);
-  const moveYes = () => setYesPos({ x: 15 + Math.random() * 70, y: 20 + Math.random() * 62 });
+  const moveYes = () => {
+    setYesAttempts((value) => Math.min(4, value + 1));
+    setYesPos({ x: 15 + Math.random() * 70, y: 20 + Math.random() * 62 });
+  };
+  const moveNo = () => setNoPos({ x: 16 + Math.random() * 68, y: 18 + Math.random() * 65 });
+  const acceptLove = () => {
+    setYesCaught(true);
+    setLoveReasonError('');
+  };
+  const saveLoveReason = () => {
+    if (loveReason.trim().split(/\s+/).filter(Boolean).length < 3) {
+      setLoveReasonError('Tell me a little more — at least three words for my scrapbook.');
+      return;
+    }
+    setLoveNoteSaved(true);
+    setLoveReasonError('');
+    setConfetti(true);
+  };
   const catchHeart = () => setHeartCount((value) => Math.min(10, value + 1));
   const catchNote = (note: string) => setNotesCaught((items) => items.includes(note) ? items : [...items, note]);
+  const resetMatchGame = () => {
+    setMatchDeck(makeMatchDeck());
+    setMatchFlipped([]);
+    setMatchMoves(0);
+    setMatchLocked(false);
+  };
+  const flipMatchCard = (id: number) => {
+    if (matchLocked || matchFlipped.length === 2) return;
+    const card = matchDeck.find((item) => item.id === id);
+    if (!card || card.flipped || card.matched) return;
+    const nextDeck = matchDeck.map((item) => item.id === id ? { ...item, flipped: true } : item);
+    const nextFlipped = [...matchFlipped, id];
+    setMatchDeck(nextDeck);
+    setMatchFlipped(nextFlipped);
+    if (nextFlipped.length === 2) {
+      setMatchMoves((value) => value + 1);
+      setMatchLocked(true);
+      const [firstId, secondId] = nextFlipped;
+      const first = nextDeck.find((item) => item.id === firstId);
+      const second = nextDeck.find((item) => item.id === secondId);
+      const isPair = first?.pair === second?.pair;
+      window.setTimeout(() => {
+        setMatchDeck((items) => items.map((item) => item.id === firstId || item.id === secondId ? { ...item, flipped: isPair, matched: isPair || item.matched } : { ...item, flipped: item.matched }));
+        setMatchFlipped([]);
+        setMatchLocked(false);
+        if (isPair && matchDeck.filter((item) => item.matched).length + 2 === matchDeck.length) setConfetti(true);
+      }, isPair ? 620 : 980);
+    }
+  };
 
   return (
     <main className="noise min-h-[100dvh] overflow-hidden bg-[#f4eee4] text-[#2c263c]">
@@ -127,7 +192,7 @@ function Home() {
             <div className="mx-auto flex max-w-7xl items-center justify-between">
               <a href="#top" data-testid="link-home-top" className="font-serif text-2xl italic text-[#d15e70]">M<span className="text-[#2c263c]"> & </span>A</a>
               <div className="hidden items-center gap-7 font-mono text-[10px] uppercase tracking-[.18em] text-[#665e6b] md:flex">
-                <a href="#story" data-testid="link-story">Our story</a><a href="#poems" data-testid="link-poems">The love notes</a><a href="#play" data-testid="link-play">Play with me</a><a href="#memories" data-testid="link-memories">Memories</a>
+                <a href="#story" data-testid="link-story">Our story</a><a href="#poems" data-testid="link-poems">The love notes</a><a href="#play" data-testid="link-play">Play with me</a><a href="#photo-match" data-testid="link-photo-match">Photo match</a><a href="#memories" data-testid="link-memories">Memories</a>
               </div>
               <span className="font-mono text-[9px] uppercase tracking-[.2em] text-[#665e6b]">19.12.24 → always</span>
             </div>
@@ -202,10 +267,11 @@ function Home() {
           <section id="play" className="bg-[#ead7c2] px-6 py-24 md:px-12 md:py-36">
             <div className="mx-auto max-w-7xl"><div className="mb-16 max-w-2xl"><p className="font-mono text-[10px] uppercase tracking-[.26em] text-[#d15e70]">The important questions</p><h2 className="mt-4 font-serif text-6xl leading-[.86] text-[#2c263c] md:text-8xl">Play with<br /><em>my heart.</em></h2></div>
               <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
-                <div className="relative min-h-[420px] overflow-hidden rounded-[1.5rem] bg-[#2c263c] p-7 text-[#f7dfc0] md:p-10"><div className="absolute right-6 top-6 rounded-full border border-[#f7dfc0]/20 px-3 py-1 font-mono text-[9px] uppercase tracking-[.16em] text-[#f7dfc0]/50">Question 01</div><div className="flex h-full min-h-[360px] flex-col items-center justify-center text-center"><Heart className="mb-6 text-[#e7818c]" size={40} fill="currentColor" /><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#e5b877]">Be honest, Jaanu</p><h3 className="mt-5 font-serif text-5xl leading-none md:text-7xl">Do you love me?</h3>{yesCaught ? <div className="reveal mt-7"><p className="font-serif text-3xl italic text-[#e7818c]">I knew it.</p><p className="mt-2 text-sm text-[#f7dfc0]/60">I love you too — more than yesterday, less than tomorrow.</p><div className="mt-5 flex justify-center gap-1 text-[#e5b877]"><Sparkles size={16} /><Sparkles size={12} /><Sparkles size={16} /></div></div> : <div className="relative mt-9 h-16 w-full max-w-sm"><button type="button" data-testid="button-yes-love" onMouseEnter={moveYes} onTouchStart={moveYes} onClick={() => { setYesCaught(true); setConfetti(true); }} className="absolute rounded-full bg-[#e7818c] px-8 py-3 text-sm font-semibold text-[#2c263c] transition-all" style={{ left: `${yesPos.x}%`, top: `${yesPos.y}%`, transform: 'translate(-50%, -50%)' }}>YES</button><button type="button" data-testid="button-no-love" onMouseEnter={() => setNoHover(true)} onMouseLeave={() => setNoHover(false)} onClick={moveYes} className="absolute left-[72%] top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#f7dfc0]/30 px-7 py-3 text-sm text-[#f7dfc0]">{noHover ? 'CLICK YES' : 'NO'}</button></div>}</div></div>
+                <div className="comic-panel relative min-h-[420px] rounded-[1.5rem] bg-[#2c263c] p-7 text-[#f7dfc0] md:p-10"><div className="web-corner right-0 top-0" /><div className="absolute right-6 top-6 comic-label">Question 01</div><div className="flex h-full min-h-[360px] flex-col items-center justify-center text-center"><Shield className="mb-6 text-[#e7818c]" size={40} /><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#e5b877]">Be honest, Jaanu</p><h3 className="mt-5 font-serif text-5xl leading-none md:text-7xl">Do you love me?</h3>{yesCaught ? loveNoteSaved ? <div className="reveal mt-7 w-full max-w-md rounded-2xl border border-[#e7818c]/50 bg-[#f7dfc0]/10 p-6 text-left"><div className="flex items-center gap-2 text-[#e5b877]"><MessageCircle size={18} /><span className="font-mono text-[10px] uppercase tracking-[.16em]">saved love note</span></div><p className="mt-5 font-serif text-2xl italic text-[#f7dfc0]">“{loveReason.trim()}”</p><p className="mt-4 text-sm leading-6 text-[#f7dfc0]/65">I knew it. I love you too — more than yesterday, less than tomorrow.</p><div className="mt-5 flex items-center gap-2 text-[#e7818c]"><Sparkles size={16} /><span className="font-mono text-[9px] uppercase tracking-[.16em]">filed under: us forever</span></div></div> : <div className="reveal mt-7 w-full max-w-md text-left"><p className="font-serif text-3xl italic text-[#e7818c]">I knew it.</p><p className="mt-2 text-sm text-[#f7dfc0]/60">Now tell me the part I’ll reread when I miss you.</p><label htmlFor="love-reason" className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.16em] text-[#e5b877]"><MessageCircle size={14} /> Why do you love me?</label><textarea id="love-reason" data-testid="textarea-love-reason" value={loveReason} onChange={(event) => { setLoveReason(event.target.value); setLoveReasonError(''); }} rows={3} className="mt-3 w-full resize-none rounded-xl border border-[#f7dfc0]/20 bg-[#f7dfc0]/10 p-4 text-sm leading-6 text-[#f7dfc0] outline-none placeholder:text-[#f7dfc0]/30 focus:border-[#e7818c]" placeholder="Write a few words for our little archive..." />{loveReasonError && <p data-testid="status-love-reason-error" className="mt-2 text-xs text-[#e7818c]">{loveReasonError}</p>}<button type="button" data-testid="button-save-love-note" onClick={saveLoveReason} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#e7818c] px-5 py-3 text-sm font-semibold text-[#2c263c] transition-transform hover:-translate-y-0.5"><Heart size={15} fill="currentColor" /> Save this love note</button></div> : <div className="relative mt-9 h-24 w-full max-w-md"><p className="mb-3 font-mono text-[9px] uppercase tracking-[.16em] text-[#f7dfc0]/45">{yesAttempts >= 3 ? 'Okay, okay — you caught me.' : `A tiny challenge · ${yesAttempts} attempt${yesAttempts === 1 ? '' : 's'}`}</p><button type="button" data-testid="button-yes-love" onMouseEnter={yesAttempts >= 3 ? undefined : moveYes} onTouchStart={yesAttempts >= 3 ? undefined : moveYes} onClick={() => { if (yesAttempts < 3) moveYes(); else acceptLove(); }} className="absolute rounded-full bg-[#e7818c] px-6 py-3 text-xs font-bold text-[#2c263c] transition-all" style={{ left: `${yesPos.x}%`, top: `${yesPos.y}%`, transform: 'translate(-50%, -50%)' }}>I LOVE YOU / YES OBVIOUSLY</button><button type="button" data-testid="button-no-love" onMouseEnter={() => { setNoHover(true); moveNo(); }} onMouseLeave={() => setNoHover(false)} onTouchStart={moveNo} onClick={moveNo} className="absolute rounded-full border border-[#f7dfc0]/30 px-7 py-3 text-sm text-[#f7dfc0] transition-all" style={{ left: `${noPos.x}%`, top: `${noPos.y}%`, transform: 'translate(-50%, -50%)' }}>{noHover ? 'TRY YES' : 'NO'}</button></div>}</div></div>
                 <div className="rounded-[1.5rem] bg-[#f4eee4] p-7 paper-shadow md:p-10"><div className="flex items-center justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#d15e70]">Question 02</p><h3 className="mt-3 font-serif text-4xl text-[#2c263c]">Catch my heart</h3></div><HandHeart className="text-[#d15e70]" size={34} /></div><p className="mt-4 text-sm leading-6 text-[#665e6b]">There are ten pieces of it drifting around. Catch every one and I’ll give you the whole thing.</p><HeartField count={heartCount} onCatch={catchHeart} /></div>
               </div>
               <div className="mt-6 rounded-[1.5rem] border border-[#2c263c]/10 bg-[#f4eee4] p-7 paper-shadow md:p-10"><div className="flex flex-col justify-between gap-6 md:flex-row md:items-center"><div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#d15e70]">Question 03 · sliding love notes</p><h3 className="mt-3 font-serif text-4xl text-[#2c263c]">Collect our firsts.</h3><p className="mt-3 max-w-xl text-sm leading-6 text-[#665e6b]">Tap each memory as it slides past. If you miss one, don’t worry — I’ll never forget it.</p></div><div className="flex flex-wrap gap-2">{['First Hii', 'First movie', 'First fight', 'First sorry'].map((note) => <button type="button" data-testid={`button-note-${note.toLowerCase().replaceAll(' ', '-')}`} key={note} onClick={() => catchNote(note)} className={`rounded-full border px-4 py-2 text-xs transition-all ${notesCaught.includes(note) ? 'border-[#d15e70] bg-[#d15e70] text-[#f4eee4]' : 'border-[#2c263c]/20 text-[#665e6b] hover:border-[#d15e70]'}`}>{notesCaught.includes(note) && <Check className="mr-1 inline" size={12} />}{note}</button>)}</div></div></div>
+              <div id="photo-match" className="comic-panel mt-10 rounded-[1.5rem] bg-[#2776a8] p-6 text-[#f7dfc0] md:p-10"><div className="web-corner right-0 top-0" /><div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-end"><div><span className="comic-label"><Zap className="mr-1" size={11} /> Question 04</span><h3 className="mt-5 font-serif text-5xl leading-[.88] text-[#f7dfc0] md:text-6xl">Find our matching<br /><em>little moments.</em></h3><p className="mt-4 max-w-lg text-sm leading-6 text-[#f7dfc0]/75">Flip two frames at a time. Match all four pairs to unlock the comic-book finale. No rushed flips — the cards need a beat.</p></div><div className="flex items-center gap-3"><div className="rounded-lg border-2 border-[#2c263c] bg-[#e6b36e] px-4 py-3 text-center text-[#2c263c] shadow-[3px_3px_0_#2c263c]"><span className="comic-caption block">moves</span><strong data-testid="status-match-moves" className="font-serif text-3xl">{matchMoves}</strong></div><button type="button" data-testid="button-reset-photo-match" onClick={resetMatchGame} className="inline-flex items-center gap-2 rounded-full border-2 border-[#2c263c] bg-[#f7dfc0] px-4 py-3 text-xs font-bold text-[#2c263c] shadow-[3px_3px_0_#2c263c] transition-transform hover:-translate-y-0.5"><RotateCcw size={14} /> Reset game</button></div></div><div className="relative z-10 mt-8 grid grid-cols-4 gap-2 sm:gap-4 md:mx-auto md:max-w-2xl">{matchDeck.map((card) => <button type="button" key={card.id} data-testid={`button-match-card-${card.id}`} aria-label={card.flipped || card.matched ? `Photo memory ${card.pair + 1} revealed` : 'Reveal a photo memory'} aria-pressed={card.flipped || card.matched} onClick={() => flipMatchCard(card.id)} className={`match-card aspect-[3/4] min-h-24 ${card.flipped ? 'is-flipped' : ''} ${card.matched ? 'is-matched' : ''}`}><span className="match-card-inner block"><span className="match-face match-back flex items-center justify-center text-[#f7dfc0]"><Heart size={22} fill="currentColor" /></span><span className="match-face match-front"><img src={card.image} alt="" /></span></span></button>)}</div><div className="relative z-10 mt-6 flex items-center justify-between font-mono text-[9px] uppercase tracking-[.16em] text-[#f7dfc0]/65"><span>{matchDeck.every((card) => card.matched) ? 'All pairs found — our story knows the way.' : `${matchDeck.filter((card) => card.matched).length / 2} of 4 pairs matched`}</span><span className="flex items-center gap-1"><Shuffle size={12} /> shuffled memories</span></div></div>
             </div>
           </section>
 
