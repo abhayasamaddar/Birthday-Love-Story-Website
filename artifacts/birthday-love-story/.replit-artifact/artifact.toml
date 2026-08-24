@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Birthday Love Story"
+description = "A cinematic, personalized birthday love story website built from a couple's photos and heartfelt message, designed to be shared as a romantic digital surprise."
+version = "1.0.0"
+id = "artifacts/birthday-love-story"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22960
+
+[services.development]
+run = "pnpm --filter @workspace/birthday-love-story run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/birthday-love-story", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/birthday-love-story/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22960"
+BASE_PATH = "/"
